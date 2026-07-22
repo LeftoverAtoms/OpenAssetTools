@@ -1,5 +1,6 @@
 #include "ObjWriterT6.h"
 
+#include "ClipMap/ClipMapGltfDumperT6.h"
 #include "FontIcon/FontIconDumperT6.h"
 #include "Game/T6/Font/FontDumperT6.h"
 #include "Game/T6/Image/ImageDumperT6.h"
@@ -49,7 +50,7 @@ void ObjWriter::RegisterAssetDumpers(AssetDumpingContext& context)
     RegisterAssetDumper(std::make_unique<image::DumperT6>());
     RegisterAssetDumper(std::make_unique<sound::SndBankDumperT6>());
     // REGISTER_DUMPER(AssetDumperSndPatch, m_sound_patch)
-    // REGISTER_DUMPER(AssetDumperClipMap, m_clip_map)
+    RegisterAssetDumper(std::make_unique<clip_map::DumperT6>());
     // REGISTER_DUMPER(AssetDumperComWorld, m_com_world)
     // REGISTER_DUMPER(AssetDumperGameWorldSp, m_game_world_sp)
     // REGISTER_DUMPER(AssetDumperGameWorldMp, m_game_world_mp)

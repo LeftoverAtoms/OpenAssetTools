@@ -1042,12 +1042,17 @@ namespace T6
 
     struct type_align32(4) cLeaf_s
     {
+        // CM_TraceThroughLeaf @ .text:006A62C0 treats this as a contiguous range
+        // in cm.aabbTrees: firstCollAabbIndex + [0, collAabbCount).
         uint16_t firstCollAabbIndex;
         uint16_t collAabbCount;
+        // CM_TraceThroughLeaf tests brushContents before CM_TraceThroughLeafBrushNode.
         int brushContents;
+        // CM_TraceThroughLeaf tests terrainContents before tracing the AABB trees.
         int terrainContents;
         vec3_t mins;
         vec3_t maxs;
+        // Brush acceleration root used by CM_TraceThroughLeafBrushNode.
         int leafBrushNode;
         int16_t cluster;
     };
@@ -1058,6 +1063,9 @@ namespace T6
         vec3_t maxs;
         float radius;
         ClipInfo* info;
+        // CM_Trace @ .text:006ADC30 passes the embedded leaf to
+        // CM_TraceThroughLeaf for non-world clip handles returned by
+        // CM_ClipHandleToModel @ .text:006A47E0.
         cLeaf_s leaf;
     };
 
@@ -3280,7 +3288,9 @@ namespace T6
 
     struct CollisionPartition
     {
-        char triCount;
+        // T6 CMod_LoadCollisionPartitions @ .text:0069D730 copies triCount from
+        // an unsigned byte at input+2, then validates firstTri + triCount <= cm.triCount.
+        uint8_t triCount;
         int firstTri;
         int nuinds;
         int fuind;
@@ -3294,6 +3304,8 @@ namespace T6
 
     struct type_align(16) CollisionAabbTree
     {
+        // Loaded by CMod_LoadCollisionAabbTrees @ .text:0069D800. Internal nodes
+        // use u.firstChildIndex with childCount; leaves use u.partitionIndex.
         vec3_t origin;
         uint16_t materialIndex;
         uint16_t childCount;

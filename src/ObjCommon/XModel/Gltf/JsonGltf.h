@@ -29,9 +29,10 @@ namespace gltf
         std::optional<std::vector<unsigned>> children;
         std::optional<unsigned> skin;
         std::optional<unsigned> mesh;
+        std::optional<nlohmann::ordered_json> extras;
     };
 
-    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonNode, name, translation, rotation, scale, matrix, children, skin, mesh);
+    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonNode, name, translation, rotation, scale, matrix, children, skin, mesh, extras);
 
     class JsonBuffer
     {
@@ -206,11 +207,13 @@ namespace gltf
     class JsonPbrMetallicRoughness
     {
     public:
+        std::optional<std::vector<float>> baseColorFactor;
         std::optional<JsonTextureInfo> baseColorTexture;
         std::optional<float> metallicFactor;
+        std::optional<float> roughnessFactor;
     };
 
-    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonPbrMetallicRoughness, baseColorTexture, metallicFactor);
+    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonPbrMetallicRoughness, baseColorFactor, baseColorTexture, metallicFactor, roughnessFactor);
 
     class JsonNormalTextureInfo
     {
@@ -226,10 +229,11 @@ namespace gltf
         std::optional<std::string> name;
         std::optional<JsonPbrMetallicRoughness> pbrMetallicRoughness;
         std::optional<JsonNormalTextureInfo> normalTexture;
+        std::optional<std::string> alphaMode;
         std::optional<bool> doubleSided;
     };
 
-    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonMaterial, name, pbrMetallicRoughness, normalTexture, doubleSided);
+    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonMaterial, name, pbrMetallicRoughness, normalTexture, alphaMode, doubleSided);
 
     enum class JsonMeshPrimitivesMode
     {
