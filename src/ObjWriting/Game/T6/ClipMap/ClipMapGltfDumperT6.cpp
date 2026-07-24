@@ -28,7 +28,6 @@ namespace
 
     constexpr auto EPSILON = 0.125f;
     constexpr auto MAX_BRUSHES_PER_INLINE_MODEL = 256u;
-    constexpr auto WORLD_BRUSHES_PER_CHUNK = 128u;
 
     constexpr auto MERGE_COLLISION_TYPES = true;
 
@@ -1011,29 +1010,6 @@ namespace
         return std::binary_search(excludedBrushIndices.begin(), excludedBrushIndices.end(), brushIndex);
     }
 
-    std::vector<int> BuildWorldBrushLeafAssignments(LeafBrushNodeCache& cache, const clipMap_t& clipMap, const std::vector<unsigned>& excludedBrushIndices)
-    {
-        std::vector<int> brushLeafAssignments(clipMap.info.numBrushes, -1);
-        if (clipMap.leafs == nullptr || clipMap.info.brushes == nullptr)
-            return brushLeafAssignments;
-
-        for (auto leafIndex = 0u; leafIndex < clipMap.numLeafs; leafIndex++)
-        {
-            const auto& leafBrushIndices = GetBrushIndicesForLeafBrushNodeCached(cache, clipMap.info, clipMap.leafs[leafIndex].leafBrushNode);
-
-            for (const auto brushIndex : leafBrushIndices)
-            {
-                if (brushIndex >= brushLeafAssignments.size() || IsExcludedBrushIndex(brushIndex, excludedBrushIndices))
-                    continue;
-
-                if (brushLeafAssignments[brushIndex] < 0)
-                    brushLeafAssignments[brushIndex] = static_cast<int>(leafIndex);
-            }
-        }
-
-        return brushLeafAssignments;
-    }
-
     std::vector<unsigned> GetAllBrushIndices(const ClipInfo& clipInfo)
     {
         std::vector<unsigned> brushIndices;
@@ -1162,8 +1138,6 @@ namespace
         const std::vector<unsigned>& excludedBrushIndices = {},
         const std::vector<unsigned>* onlyBrushIndices = nullptr,
         const bool separateBrushes = false,
-        const bool chunkBrushes = false,
-        const std::vector<int>* brushLeafAssignments = nullptr,
         const bool useLocalBrushNames = false,
         const bool groupByContents = true)
     {
@@ -1193,10 +1167,6 @@ namespace
 
             if (separateBrushes)
                 brushGroupName += "/brush_" + std::to_string(useLocalBrushNames ? localBrushIndex : brushIndex);
-            else if (brushLeafAssignments != nullptr && brushIndex < brushLeafAssignments->size() && (*brushLeafAssignments)[brushIndex] >= 0)
-                brushGroupName += "/leaf_" + std::to_string((*brushLeafAssignments)[brushIndex]);
-            else if (chunkBrushes)
-                brushGroupName += "/chunk_" + std::to_string(brushIndex / WORLD_BRUSHES_PER_CHUNK);
 
             localBrushIndex++;
 
@@ -1693,8 +1663,6 @@ namespace clip_map
             nullptr,
             false,
             false,
-            nullptr,
-            false,
             false);
         con::warn(
             "Clipmap \"{}\" has {} cmodels with brushes, {} cmodels with own clipinfo brushes, {} oversized inline models skipped, and {} inline model transforms from map ents",
@@ -1789,8 +1757,6 @@ namespace clip_map
                     {},
                     &collisionSet.brushIndices,
                     true,
-                    false,
-                    nullptr,
                     true);
             }
         }
