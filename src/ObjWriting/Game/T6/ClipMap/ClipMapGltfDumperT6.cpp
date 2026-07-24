@@ -30,10 +30,6 @@ namespace
     constexpr auto MAX_BRUSHES_PER_INLINE_MODEL = 256u;
     constexpr auto WORLD_BRUSHES_PER_CHUNK = 128u;
 
-    constexpr auto EXPORT_WORLD_BRUSHES = true;
-    constexpr auto EXPORT_NON_BRUSH_TRIANGLES = true;
-    constexpr auto EXPORT_INLINE_MODEL_NON_BRUSH_TRIANGLES = true;
-
     constexpr auto MERGE_COLLISION_TYPES = true;
 
     struct MeshPrimitive
@@ -1671,40 +1667,35 @@ namespace clip_map
         std::sort(inlineModelPartitionIndices.begin(), inlineModelPartitionIndices.end());
         inlineModelPartitionIndices.erase(std::unique(inlineModelPartitionIndices.begin(), inlineModelPartitionIndices.end()), inlineModelPartitionIndices.end());
 
-        if constexpr (EXPORT_NON_BRUSH_TRIANGLES)
-        {
-            const auto* excludedWorldPartitions = EXPORT_INLINE_MODEL_NON_BRUSH_TRIANGLES ? &inlineModelPartitionIndices : nullptr;
-            // World non-brush also follows the AABB -> partition -> triIndices path
-            // from CM_TraceThroughLeaf. Keep static world non-brush combined here;
-            // partition/AABB identity is traversal data, not an object boundary.
-            auto collisionTriangles = BuildNonBrushCollisionMeshes(
-                *clipMap,
-                "world",
-                {},
-                worldAabbTreeRootIndices,
-                {},
-                false,
-                nullptr,
-                excludedWorldPartitions);
-            nonBrushPrimitiveCount += static_cast<unsigned>(collisionTriangles.size());
-            for (auto& primitive : collisionTriangles)
-                primitives.emplace_back(std::move(primitive));
-        }
+        // World non-brush also follows the AABB -> partition -> triIndices path
+        // from CM_TraceThroughLeaf. Keep static world non-brush combined here;
+        // partition/AABB identity is traversal data, not an object boundary.
+        auto collisionTriangles = BuildNonBrushCollisionMeshes(
+            *clipMap,
+            "world",
+            {},
+            worldAabbTreeRootIndices,
+            {},
+            false,
+            nullptr,
+            &inlineModelPartitionIndices);
+        nonBrushPrimitiveCount += static_cast<unsigned>(collisionTriangles.size());
+        for (auto& primitive : collisionTriangles)
+            primitives.emplace_back(std::move(primitive));
 
-        if constexpr (EXPORT_WORLD_BRUSHES)
-            AppendClipInfoBrushes(
-                primitives,
-                clipMap->info,
-                "world",
-                {},
-                inlineModelBrushes,
-                inlineModelWorldBrushIndices,
-                nullptr,
-                false,
-                false,
-                nullptr,
-                false,
-                false);
+        AppendClipInfoBrushes(
+            primitives,
+            clipMap->info,
+            "world",
+            {},
+            inlineModelBrushes,
+            inlineModelWorldBrushIndices,
+            nullptr,
+            false,
+            false,
+            nullptr,
+            false,
+            false);
         con::warn(
             "Clipmap \"{}\" has {} cmodels with brushes, {} cmodels with own clipinfo brushes, {} oversized inline models skipped, and {} inline model transforms from map ents",
             asset.m_name,
@@ -1768,27 +1759,24 @@ namespace clip_map
 
         for (const auto& collisionSet : inlineModelCollisionSets)
         {
-            if constexpr (EXPORT_INLINE_MODEL_NON_BRUSH_TRIANGLES)
-            {
-                InlineModelTransform transform{};
-                transform.origin = collisionSet.origin;
-                transform.angles = collisionSet.angles;
-                // Model non-brush uses cmodel.leaf AABB roots as traversal, with
-                // collisionSet.partitionIndices as the ownership filter. This mirrors
-                // CM_Trace's model branch while avoiding duplicate world/model export.
-                auto modelCollisionTriangles = BuildNonBrushCollisionMeshes(
-                    *clipMap,
-                    "model_*" + std::to_string(collisionSet.modelIndex),
-                    transform,
-                    collisionSet.aabbTreeIndices,
-                    {},
-                    false,
-                    &collisionSet.partitionIndices,
-                    nullptr);
-                nonBrushPrimitiveCount += static_cast<unsigned>(modelCollisionTriangles.size());
-                for (auto& primitive : modelCollisionTriangles)
-                    primitives.emplace_back(std::move(primitive));
-            }
+            InlineModelTransform transform{};
+            transform.origin = collisionSet.origin;
+            transform.angles = collisionSet.angles;
+            // Model non-brush uses cmodel.leaf AABB roots as traversal, with
+            // collisionSet.partitionIndices as the ownership filter. This mirrors
+            // CM_Trace's model branch while avoiding duplicate world/model export.
+            auto modelCollisionTriangles = BuildNonBrushCollisionMeshes(
+                *clipMap,
+                "model_*" + std::to_string(collisionSet.modelIndex),
+                transform,
+                collisionSet.aabbTreeIndices,
+                {},
+                false,
+                &collisionSet.partitionIndices,
+                nullptr);
+            nonBrushPrimitiveCount += static_cast<unsigned>(modelCollisionTriangles.size());
+            for (auto& primitive : modelCollisionTriangles)
+                primitives.emplace_back(std::move(primitive));
 
             if (collisionSet.clipInfo != nullptr && collisionSet.clipInfo->brushes != nullptr && !collisionSet.brushIndices.empty())
             {
