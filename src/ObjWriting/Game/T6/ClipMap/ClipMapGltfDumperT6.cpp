@@ -83,13 +83,6 @@ namespace
         bool usesOwnClipInfo;
     };
 
-    enum class NonBrushSplitMode
-    {
-        Material,
-        Partition,
-        AabbRoot,
-    };
-
     using LeafBrushNodeCache = std::map<int, std::vector<unsigned>>;
 
     template<typename T> void SortUnique(std::vector<T>& values)
@@ -490,9 +483,7 @@ namespace
         const std::string& sourceName,
         const InlineModelTransform& transform,
         const std::vector<int>* onlyPartitionIndices,
-        const std::vector<int>* excludedPartitionIndices,
-        const NonBrushSplitMode splitMode,
-        const int rootTreeIndex)
+        const std::vector<int>* excludedPartitionIndices)
     {
         if (treeIndex < 0 || treeIndex >= clipMap.aabbTreeCount)
             return;
@@ -512,9 +503,7 @@ namespace
                     sourceName,
                     transform,
                     onlyPartitionIndices,
-                    excludedPartitionIndices,
-                    splitMode,
-                    rootTreeIndex);
+                    excludedPartitionIndices);
 
             return;
         }
@@ -560,29 +549,14 @@ namespace
                 + " numMaterials="
                 + std::to_string(clipMap.info.numMaterials));
 
-        auto meshKey = std::to_string(tree.materialIndex);
-        if (splitMode == NonBrushSplitMode::Partition)
-            meshKey = "partition_" + std::to_string(partitionIndex) + "_material_" + std::to_string(tree.materialIndex);
-        else if (splitMode == NonBrushSplitMode::AabbRoot)
-            meshKey = "aabb_" + std::to_string(rootTreeIndex) + "_material_" + std::to_string(tree.materialIndex);
-
-        auto& mesh = byMaterial[meshKey];
+        auto& mesh = byMaterial[std::to_string(tree.materialIndex)];
         if (mesh.name.empty())
         {
             const auto& material = clipMap.info.materials[tree.materialIndex];
             const auto materialName = material.name && material.name[0] ? material.name : "unknown";
-            const auto contentFlags = static_cast<unsigned>(material.contentFlags);
 
             mesh.name = materialName;
-            if (splitMode == NonBrushSplitMode::AabbRoot && MERGE_COLLISION_TYPES)
-                mesh.groupName = sourceName + "/nonbrush/aabb_" + std::to_string(rootTreeIndex);
-            else
-                mesh.groupName = sourceName + "/nonbrush/contents_0x" + Hex(contentFlags);
-
-            if (splitMode == NonBrushSplitMode::Partition)
-                mesh.groupName += "/partition_" + std::to_string(partitionIndex);
-            else if (splitMode == NonBrushSplitMode::AabbRoot && !MERGE_COLLISION_TYPES)
-                mesh.groupName += "/aabb_" + std::to_string(rootTreeIndex);
+            mesh.groupName = sourceName + "/nonbrush";
             mesh.color = ColorForIndex(tree.materialIndex);
         }
 
@@ -627,8 +601,7 @@ namespace
         const std::vector<int>& excludedTreeIndices = {},
         const bool includeUnclassifiedTriangles = true,
         const std::vector<int>* onlyPartitionIndices = nullptr,
-        const std::vector<int>* excludedPartitionIndices = nullptr,
-        const NonBrushSplitMode splitMode = NonBrushSplitMode::Material)
+        const std::vector<int>* excludedPartitionIndices = nullptr)
     {
         if (clipMap.verts == nullptr || clipMap.triIndices == nullptr || clipMap.vertCount == 0u || clipMap.triCount <= 0)
             return {};
@@ -654,9 +627,7 @@ namespace
                         sourceName,
                         transform,
                         onlyPartitionIndices,
-                        excludedPartitionIndices,
-                        splitMode,
-                        treeIndex);
+                        excludedPartitionIndices);
             }
             else
             {
@@ -673,9 +644,7 @@ namespace
                         sourceName,
                         transform,
                         onlyPartitionIndices,
-                        excludedPartitionIndices,
-                        splitMode,
-                        treeIndex);
+                        excludedPartitionIndices);
                 }
             }
         }
@@ -695,7 +664,7 @@ namespace
                 if (mesh.name.empty())
                 {
                     mesh.name = "unclassified";
-                    mesh.groupName = sourceName + "/nonbrush/contents_unknown";
+                    mesh.groupName = sourceName + "/nonbrush";
                     mesh.color = {0.7f, 0.7f, 0.7f};
                 }
                 const auto a = TransformPoint(clipMap.verts[tri[0]], transform);
@@ -1706,9 +1675,8 @@ namespace clip_map
         {
             const auto* excludedWorldPartitions = EXPORT_INLINE_MODEL_NON_BRUSH_TRIANGLES ? &inlineModelPartitionIndices : nullptr;
             // World non-brush also follows the AABB -> partition -> triIndices path
-            // from CM_TraceThroughLeaf. We split world output by the root AABB
-            // nodes referenced by world leaves; Radiant patch identity is gone by
-            // this point, but AABB roots preserve the engine's spatial grouping.
+            // from CM_TraceThroughLeaf. Keep static world non-brush combined here;
+            // partition/AABB identity is traversal data, not an object boundary.
             auto collisionTriangles = BuildNonBrushCollisionMeshes(
                 *clipMap,
                 "world",
@@ -1717,8 +1685,7 @@ namespace clip_map
                 {},
                 false,
                 nullptr,
-                excludedWorldPartitions,
-                NonBrushSplitMode::AabbRoot);
+                excludedWorldPartitions);
             nonBrushPrimitiveCount += static_cast<unsigned>(collisionTriangles.size());
             for (auto& primitive : collisionTriangles)
                 primitives.emplace_back(std::move(primitive));
@@ -1810,7 +1777,14 @@ namespace clip_map
                 // collisionSet.partitionIndices as the ownership filter. This mirrors
                 // CM_Trace's model branch while avoiding duplicate world/model export.
                 auto modelCollisionTriangles = BuildNonBrushCollisionMeshes(
-                    *clipMap, "model_*" + std::to_string(collisionSet.modelIndex), transform, collisionSet.aabbTreeIndices, {}, false, &collisionSet.partitionIndices);
+                    *clipMap,
+                    "model_*" + std::to_string(collisionSet.modelIndex),
+                    transform,
+                    collisionSet.aabbTreeIndices,
+                    {},
+                    false,
+                    &collisionSet.partitionIndices,
+                    nullptr);
                 nonBrushPrimitiveCount += static_cast<unsigned>(modelCollisionTriangles.size());
                 for (auto& primitive : modelCollisionTriangles)
                     primitives.emplace_back(std::move(primitive));
