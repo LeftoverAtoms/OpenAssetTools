@@ -35,7 +35,6 @@ namespace
     constexpr auto EXPORT_INLINE_MODEL_NON_BRUSH_TRIANGLES = true;
 
     constexpr auto MERGE_COLLISION_TYPES = true;
-    constexpr auto COMBINE_BRUSHES = true;
 
     struct MeshPrimitive
     {
@@ -1201,8 +1200,7 @@ namespace
         const bool chunkBrushes = false,
         const std::vector<int>* brushLeafAssignments = nullptr,
         const bool useLocalBrushNames = false,
-        const bool groupByContents = true,
-        const bool groupByMaterial = false)
+        const bool groupByContents = true)
     {
         if (clipInfo.brushes == nullptr)
             return;
@@ -1243,16 +1241,12 @@ namespace
             for (const auto& brushSide : brushSides)
             {
                 const auto materialName = GetBrushSideMaterialName(clipInfo, brushSide);
-                auto materialGroupName = brushGroupName;
-                if (groupByMaterial)
-                    materialGroupName += "/" + materialName;
-
-                const auto mapKey = materialGroupName + "_" + materialName;
+                const auto mapKey = brushGroupName + "_" + materialName;
                 auto& groupedBrushMesh = brushesByMaterialAndContents[mapKey];
                 if (groupedBrushMesh.name.empty())
                 {
                     groupedBrushMesh.name = materialName;
-                    groupedBrushMesh.groupName = materialGroupName;
+                    groupedBrushMesh.groupName = brushGroupName;
                     groupedBrushMesh.color = ColorForIndex(static_cast<unsigned>(brushesByMaterialAndContents.size() + 8u));
                 }
 
@@ -1743,8 +1737,7 @@ namespace clip_map
                 false,
                 nullptr,
                 false,
-                false,
-                true);
+                false);
         con::warn(
             "Clipmap \"{}\" has {} cmodels with brushes, {} cmodels with own clipinfo brushes, {} oversized inline models skipped, and {} inline model transforms from map ents",
             asset.m_name,
@@ -1774,7 +1767,6 @@ namespace clip_map
             *debugFile << "inlineModelNonBrushPartitions=" << inlineModelPartitionIndices.size() << "\n";
             *debugFile << "worldNonBrushAabbRoots=" << worldAabbTreeRootIndices.size() << "\n";
             *debugFile << "mergeCollisionTypes=" << (MERGE_COLLISION_TYPES ? "true" : "false") << "\n";
-            *debugFile << "combineBrushes=" << (COMBINE_BRUSHES ? "true" : "false") << "\n";
             *debugFile << "duplicateNonBrushModelsSkipped=" << duplicateNonBrushModelsSkipped << "\n";
             *debugFile << "worldLeafs=" << clipMap->numLeafs << "\n";
             *debugFile << "nonBrushPrimitiveCount=" << nonBrushPrimitiveCount << "\n";
@@ -1834,7 +1826,7 @@ namespace clip_map
                     {},
                     {},
                     &collisionSet.brushIndices,
-                    !COMBINE_BRUSHES,
+                    true,
                     false,
                     nullptr,
                     true);
